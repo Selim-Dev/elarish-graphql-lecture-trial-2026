@@ -1,26 +1,25 @@
-import { authors, books } from './data.js';
-
-// KEY CONCEPT:
-// Resolvers can be defined on ANY type, not just Query.
-// When GraphQL sees `book.author`, it looks for `Book.author`
-// in the resolvers map.
+// Resolvers are now ASYNC because Mongo calls are async.
 //
-// The 1st argument (`parent`) is the Book object — so we use
-// `parent.authorId` to find the author.
+// Notice: Mongoose documents have `_id`, but GraphQL asks for `id`.
+// Mongoose exposes a virtual `id` getter (string version of `_id`),
+// so `doc.id` Just Works™.
+
+import { Author } from './models/Author.js';
+import { Book } from './models/Book.js';
 
 export const resolvers = {
   Query: {
-    books: () => books,
-    authors: () => authors,
+    books:   () => Book.find(),
+    authors: () => Author.find(),
   },
 
   Book: {
-    // Called once per Book when the client asks for `author`.
-    author: (book) => authors.find((a) => a.id === book.authorId),
+    // parent = a Book document; `parent.author` is an ObjectId.
+    author: (book) => Author.findById(book.author),
   },
 
   Author: {
-    // Called once per Author when the client asks for `books`.
-    books: (author) => books.filter((b) => b.authorId === author.id),
+    // Find every book whose `author` field points at this author's id.
+    books: (author) => Book.find({ author: author._id }),
   },
 };

@@ -1,9 +1,4 @@
-// Mutations are just like queries — they take args and return data —
-// but they signal WRITE intent. Convention: name them with a verb
-// (addBook, updateBook, deleteBook).
-//
-// `input` types are used ONLY as mutation arguments.
-// You cannot use a regular `type` as an argument — that's the rule.
+// Schema is unchanged — same contract, different storage.
 
 export const typeDefs = `#graphql
   type Book {

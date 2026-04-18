@@ -7,12 +7,9 @@ export const connectDB = async () => {
 
   if ((await Book.countDocuments()) === 0) {
     await Book.create([
-      { title: 'The Pragmatic Programmer' },
-      { title: 'Clean Code' },
+      { title: 'The Pragmatic Programmer', pages: 352 },
+      { title: 'Clean Code',               pages: 464 },
     ]);
     console.log('🌱 Seeded books');
   }
 };
-
-// Grouping models into one object makes it easy to drop on context.
-export const models = { Book };

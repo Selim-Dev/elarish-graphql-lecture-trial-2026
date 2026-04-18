@@ -1,21 +1,16 @@
-// Tiny helpers around JWT. In production use a real secret from env.
+// Tiny helpers around JWT.
 import jwt from 'jsonwebtoken';
-import { users } from './data.js';
+import { User } from './models/User.js';
 
-const JWT_SECRET = 'classroom-demo-secret-do-not-use-in-prod';
-
-// Create a signed token from a user object.
 export const signToken = (user) =>
-  jwt.sign({ sub: user.id, email: user.email }, JWT_SECRET, {
-    expiresIn: '1h',
-  });
+  jwt.sign({ sub: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-// Verify a token and return the matching user, or null.
-export const userFromToken = (token) => {
+// Verify a token and return the matching User document, or null.
+export const userFromToken = async (token) => {
   if (!token) return null;
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    return users.find((u) => u.id === payload.sub) ?? null;
+    const { sub } = jwt.verify(token, process.env.JWT_SECRET);
+    return User.findById(sub);
   } catch {
     return null; // invalid or expired
   }

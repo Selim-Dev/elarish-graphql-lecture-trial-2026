@@ -1,23 +1,25 @@
 // ─────────────────────────────────────────────────────────────
-// Lesson 6 — Authentication with JWT
+// Lesson 6 — Authentication with JWT (Mongoose edition)
 // ─────────────────────────────────────────────────────────────
 // Flow:
-//   1. Client calls `login(email, password)` mutation.
+//   1. Client → Mutation: login(email, password)
 //   2. Server verifies password (bcrypt), returns a JWT.
-//   3. Client stores the JWT and sends it on future requests as:
+//   3. Client stores the JWT; sends it on future requests as:
 //          Authorization: Bearer <token>
 //   4. Context parses the header and puts `user` on context.
 //   5. Resolvers read `context.user` to decide what to do.
 
+import 'dotenv/config';
+
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
-import bcrypt from 'bcryptjs';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import { GraphQLError } from 'graphql';
 
-import { users } from './data.js';
+import { connectDB } from './db.js';
+import { User } from './models/User.js';
 import { signToken, userFromToken } from './auth.js';
 
 const typeDefs = `#graphql
@@ -25,8 +27,7 @@ const typeDefs = `#graphql
   type AuthPayload { token: String!  user: User! }
 
   type Query {
-    # Returns null if no valid token was sent.
-    me: User
+    me: User   # null unless a valid token was sent
   }
 
   type Mutation {
@@ -36,16 +37,14 @@ const typeDefs = `#graphql
 
 const resolvers = {
   Query: {
-    // `user` comes from the context — see below.
     me: (_p, _a, { user }) => user,
   },
 
   Mutation: {
     login: async (_p, { email, password }) => {
-      const user = users.find((u) => u.email === email);
-      const ok = user && (await bcrypt.compare(password, user.passwordHash));
+      const user = await User.findOne({ email: email.toLowerCase() });
+      const ok = user && (await user.comparePassword(password));
       if (!ok) {
-        // GraphQLError is the idiomatic way to return errors.
         throw new GraphQLError('Invalid email or password', {
           extensions: { code: 'UNAUTHENTICATED' },
         });
@@ -54,6 +53,8 @@ const resolvers = {
     },
   },
 };
+
+await connectDB();
 
 const apollo = new ApolloServer({ typeDefs, resolvers });
 await apollo.start();
@@ -65,10 +66,9 @@ app.use(
   bodyParser.json(),
   expressMiddleware(apollo, {
     context: async ({ req }) => {
-      // "Authorization: Bearer <token>"  →  "<token>"
       const header = req.headers.authorization ?? '';
       const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-      const user = userFromToken(token);
+      const user = await userFromToken(token);
       return { user };
     },
   }),

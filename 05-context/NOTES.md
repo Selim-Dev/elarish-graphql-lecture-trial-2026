@@ -1,37 +1,47 @@
-# Lesson 5 — Context
+# Lesson 5 — Context (Mongoose edition)
 
-## What students should leave with
+## Setup
 
-- **Context = per-request shared bag.** One fresh object per HTTP request.
-- It's the standard place to inject `db`, the logged-in `user`, and request-scoped utilities.
-- Resolvers read it as the 3rd argument: `(parent, args, context, info)`.
+```bash
+cp .env.example .env
+npm install
+npm start
+```
 
-## Where it’s set
+## Two questions answered
 
-In `expressMiddleware`:
+### Q1. What is context?
+
+A fresh object Apollo builds **per HTTP request** and passes to every resolver as the 3rd argument.
+
+### Q2. Why inject models through it instead of importing them directly?
+
+- **Testability** — a unit test can pass `{ models: mockModels }` without touching Mongo.
+- **Decoupling** — resolvers don't know which file defined the model.
+- **Per-request state** — if you ever run two tenants with separate DBs, you swap models per request.
+
+## The code
 
 ```js
+// db.js
+export const models = { Book };          // one bag of models
+
+// index.js
 expressMiddleware(apollo, {
-  context: async ({ req }) => ({ db, req }),
+  context: async ({ req }) => ({ models, req }),
 });
+
+// resolvers — read models from context
+books: (_p, _a, { models }) => models.Book.find(),
 ```
 
-That function runs for **every request**. Returned object = context.
+## Try it
 
-## Why not globals?
-
-Because context is **per-request**, two requests can't accidentally share data.
-If you put the logged-in user on a global you would get session bleed between users.
-
-## Demo
-
-Send a request with a custom header in Sandbox (Headers tab):
-
-```
-X-User: alice
+```graphql
+query { books { id title } }
 ```
 
-Then query:
+Add a header `X-User: alice` then:
 
 ```graphql
 query { whoAmI }
@@ -41,5 +51,4 @@ query { whoAmI }
 
 ## What’s next
 
-This sets us up for **authentication** (lesson 6). We’ll parse a JWT from the
-`Authorization` header inside the context function and put the user on `context`.
+Lesson 6 builds on this: `context` will also carry the currently-logged-in `user`, parsed from a JWT header.

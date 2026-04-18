@@ -1,33 +1,31 @@
-import { books, generateId } from './data.js';
+// Mongoose CRUD cheat sheet used below:
+//   Model.find()                      → all docs
+//   Model.findById(id)                → one doc or null
+//   Model.create(input)               → insert
+//   Model.findByIdAndUpdate(id, patch, { new: true })
+//                                     → returns the UPDATED doc
+//   Model.findByIdAndDelete(id)       → returns the deleted doc (or null)
+
+import { Book } from './models/Book.js';
 
 export const resolvers = {
   Query: {
-    books: () => books,
-    book: (_p, { id }) => books.find((b) => b.id === id),
+    books: () => Book.find(),
+    book:  (_p, { id }) => Book.findById(id),
   },
 
   Mutation: {
-    // CREATE — returns the newly created book.
-    addBook: (_p, { input }) => {
-      const book = { id: generateId(), ...input };
-      books.push(book);
-      return book;
-    },
+    addBook: (_p, { input }) => Book.create(input),
 
-    // UPDATE — returns the updated book, or null if not found.
-    updateBook: (_p, { id, input }) => {
-      const book = books.find((b) => b.id === id);
-      if (!book) return null;
-      Object.assign(book, input); // only overwrites provided fields
-      return book;
-    },
+    updateBook: (_p, { id, input }) =>
+      Book.findByIdAndUpdate(id, input, {
+        new: true,          // return the updated document, not the old one
+        runValidators: true, // re-run schema validation on update
+      }),
 
-    // DELETE — returns true/false to tell the client what happened.
-    deleteBook: (_p, { id }) => {
-      const index = books.findIndex((b) => b.id === id);
-      if (index === -1) return false;
-      books.splice(index, 1);
-      return true;
+    deleteBook: async (_p, { id }) => {
+      const deleted = await Book.findByIdAndDelete(id);
+      return deleted !== null;
     },
   },
 };

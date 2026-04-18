@@ -1,14 +1,18 @@
 // ─────────────────────────────────────────────────────────────
-// Lesson 5 — Context
+// Lesson 5 — Context (Mongoose edition)
 // ─────────────────────────────────────────────────────────────
-// CONTEXT is an object shared by every resolver in a single
-// request. It's the standard place to put things like:
-//   - the database connection
-//   - the currently-logged-in user
+// CONTEXT is an object built PER REQUEST. It's the standard place
+// to put things every resolver may need:
+//   - the database / models
+//   - the currently-logged-in user (covered in Lesson 6)
 //   - request-scoped loaders (DataLoader)
 //
-// Apollo BUILDS a fresh context object FOR EACH REQUEST, by
-// calling the `context` function you pass to expressMiddleware.
+// Why put `models` on context instead of importing them directly?
+//   ✅ Tests can swap in mocks per request.
+//   ✅ You never couple a resolver to a specific import path.
+//   ✅ Scales to multi-tenant apps (different DB per request).
+
+import 'dotenv/config';
 
 import express from 'express';
 import cors from 'cors';
@@ -16,7 +20,7 @@ import bodyParser from 'body-parser';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 
-import { db } from './db.js';
+import { connectDB, models } from './db.js';
 
 const typeDefs = `#graphql
   type Book { id: ID!  title: String! }
@@ -25,20 +29,21 @@ const typeDefs = `#graphql
     books: [Book!]!
     book(id: ID!): Book
 
-    # Demo field that echoes a header back — uses context.req.
+    # Demo field — echoes a header back to prove context has `req`.
     whoAmI: String
   }
 `;
 
 const resolvers = {
   Query: {
-    // 3rd argument is the CONTEXT. Destructure what you need.
-    books:   (_p, _a, { db })     => db.findAllBooks(),
-    book:    (_p, { id }, { db }) => db.findBookById(id),
-    whoAmI:  (_p, _a, { req })    =>
-      req.headers['x-user'] ?? 'anonymous',
+    // 3rd arg is the CONTEXT. Destructure what you need from it.
+    books:   (_p, _a, { models })    => models.Book.find(),
+    book:    (_p, { id }, { models }) => models.Book.findById(id),
+    whoAmI:  (_p, _a, { req })       => req.headers['x-user'] ?? 'anonymous',
   },
 };
+
+await connectDB();
 
 const apollo = new ApolloServer({ typeDefs, resolvers });
 await apollo.start();
@@ -49,12 +54,8 @@ app.use(
   cors(),
   bodyParser.json(),
   expressMiddleware(apollo, {
-    // This runs ONCE PER REQUEST. Whatever you return here
-    // becomes the 3rd argument of every resolver.
-    context: async ({ req }) => ({
-      db,
-      req, // so resolvers can read headers, IP, etc.
-    }),
+    // Runs ONCE PER REQUEST. Return value = context.
+    context: async ({ req }) => ({ models, req }),
   }),
 );
 
